@@ -1,0 +1,36 @@
+{
+  "name": "sf-autodeploy",
+  "displayName": "SF AutoDeploy",
+  "publisher": "ccmalcom",
+  "description": "SF AutoDeploy is a Visual Studio Code extension designed for rapid Salesforce development, perfect for situations where you need to quickly test and see changes—especially when making frequent tweaks to Lightning Web Components (LWC). By automatically deploying changes upon save, it removes the need to run manual deployment commands and helps you stay focused on development.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "sf-autodeploy.selectFiles",
+        "title": "Select Files to Watch"
+      }
+    ]
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "pretest": "npm run lint",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.93.0",
+    "@types/mocha": "^10.0.7",
+    "@types/node": "20.x",
+    "eslint": "^9.9.1",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1"
+  }
+}
