@@ -110,7 +110,7 @@ suite('Extension Test Suite', function () {
 		vscode.window.showOpenDialog = async function () {
 			// Simulate file selection by returning a mock URI array
 			return [
-				vscode.Uri.file('/mock/path/to/file')
+				vscode.Uri.file('/mock/path/to/force-app/main/default/file')
 			];
 		};
 
@@ -157,7 +157,7 @@ suite('Extension Test Suite', function () {
 		const showOpenDialog = vscode.window.showOpenDialog;
 		vscode.window.showOpenDialog = async function () {
 			return [
-				vscode.Uri.file('/mock/path/to/file')
+				vscode.Uri.file('/mock/path/to/force-app/main/default/file')
 			];
 		};
 

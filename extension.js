@@ -40,6 +40,17 @@ function activate(context) {
 				} else {
 					// Store the valid selected paths to watch
 					vscode.window.showInformationMessage('Files selected successfully.');
+					selectedItems.forEach(item => {
+						// Watch for changes in selected files/folders
+						const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(item.fsPath, '**/*'));
+
+						watcher.onDidChange(uri => {
+							deployFile(uri.fsPath);
+						});
+
+						context.subscriptions.push(watcher);
+					});
+
 				}
 			}
 		});
