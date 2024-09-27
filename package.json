@@ -16,7 +16,7 @@
     "commands": [
       {
         "command": "sf-autodeploy.selectFiles",
-        "title": "Select Files to Watch"
+        "title": "SF AutoDeploy: Select Files to Watch"
       }
     ]
   },

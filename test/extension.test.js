@@ -43,6 +43,66 @@ suite('Extension Test Suite', function () {
 		assert.ok(true, 'File selection command should run without throwing errors');
 	});
 
+	// Test that only files from force-app/main/default directory are accepted and invalid files trigger a warning
+	test('Validate file selection based on path to force-app/main/default', async () => {
+		// Mock vscode.window.showOpenDialog to simulate file selection
+		const showOpenDialog = vscode.window.showOpenDialog;
+		const showWarningMessage = vscode.window.showWarningMessage;
+		const showInformationMessage = vscode.window.showInformationMessage;
+
+		// Simulate showing warning and information messages
+		let warningMessageShown = false;
+		let informationMessageShown = false;
+
+		vscode.window.showWarningMessage = async function (message) {
+			warningMessageShown = true;
+			return message;
+		};
+
+		vscode.window.showInformationMessage = async function (message) {
+			informationMessageShown = true;
+			return message;
+		};
+
+		// Define test cases for both valid and invalid file selections
+		const testCases = [
+			{
+				description: 'Invalid file path',
+				selectedFiles: [vscode.Uri.file('/mock/path/to/invalid/file')],
+				shouldShowWarning: true,
+				shouldShowInformation: false
+			},
+			{
+				description: 'Valid file path within force-app/main/default',
+				selectedFiles: [vscode.Uri.file('/mock/path/to/force-app/main/default/file')],
+				shouldShowWarning: false,
+				shouldShowInformation: true
+			}
+		];
+
+		for (const testCase of testCases) {
+			// Reset message flags for each test case
+			warningMessageShown = false;
+			informationMessageShown = false;
+
+			vscode.window.showOpenDialog = async function () {
+				return testCase.selectedFiles;
+			};
+
+			// Simulate invoking the command
+			await vscode.commands.executeCommand('sf-autodeploy.selectFiles');
+
+			// Assert correct behavior for each test case
+			assert.strictEqual(warningMessageShown, testCase.shouldShowWarning, `Warning message should ${testCase.shouldShowWarning ? 'be' : 'not be'} shown for ${testCase.description}`);
+			assert.strictEqual(informationMessageShown, testCase.shouldShowInformation, `Information message should ${testCase.shouldShowInformation ? 'be' : 'not be'} shown for ${testCase.description}`);
+		}
+
+		// Restore the original functions
+		vscode.window.showOpenDialog = showOpenDialog;
+		vscode.window.showWarningMessage = showWarningMessage;
+		vscode.window.showInformationMessage = showInformationMessage;
+	});
+
 	// Test that file watching is initiated (Mocking)
 	test('File watcher should be created for selected files', async () => {
 		// Mock vscode.window.showOpenDialog to simulate file selection
