@@ -11,11 +11,16 @@ function activate(context) {
 		? vscode.workspace.workspaceFolders[0].uri.with({ path: vscode.workspace.workspaceFolders[0].uri.path + '/force-app/main/default' })
 		: vscode.Uri.file(require('os').homedir());  // Fallback to home directory if no workspace is open
 
+	// Status bar item to show AutoDeploy status
+	const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+	statusBarItem.text = 'AutoDeploy: Not Watching';
+	statusBarItem.show();
+	context.subscriptions.push(statusBarItem);
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with  registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('sf-autodeploy.selectFiles', function () {
+	let watchers = []; // Array to store active file watchers
+
+	// Command to select files and set up watchers
+	const disposable = vscode.commands.registerCommand('sf-autodeploy.startWatching', function () {
 		vscode.window.showOpenDialog({
 			canSelectFiles: true,
 			canSelectFolders: true,
@@ -31,32 +36,42 @@ function activate(context) {
 			}
 		}).then(selectedItems => {
 			if (selectedItems) {
-				// Check if all selected files are within the force-app/main/default directory
 				const invalidSelections = selectedItems.filter(item => !item.fsPath.includes('force-app/main/default'));
 
 				if (invalidSelections.length > 0) {
-					// If any files are outside the allowed directory, show a warning message
 					vscode.window.showWarningMessage('Please select only files from within the force-app/main/default directory.');
 				} else {
-					// Store the valid selected paths to watch
 					vscode.window.showInformationMessage('Files selected successfully.');
+					statusBarItem.text = `AutoDeploy: Watching ${selectedItems.length} item(s)`;
+
 					selectedItems.forEach(item => {
-						// Watch for changes in selected files/folders
 						const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(item.fsPath, '**/*'));
 
 						watcher.onDidChange(uri => {
 							deployFile(uri.fsPath);
 						});
 
+						watchers.push(watcher); // Store watcher
 						context.subscriptions.push(watcher);
 					});
-
 				}
 			}
 		});
 	});
-
 	context.subscriptions.push(disposable);
+
+	// Command to stop watching files
+	const disposable2 = vscode.commands.registerCommand('sf-autodeploy.stopWatching', function () {
+		if (watchers.length > 0) {
+			watchers.forEach(watcher => watcher.dispose()); // Dispose all watchers
+			watchers = []; // Clear the watchers array
+			vscode.window.showInformationMessage('Stopped watching files.');
+			statusBarItem.text = 'AutoDeploy: Not Watching';
+		} else {
+			vscode.window.showInformationMessage('No active watchers to stop.');
+		}
+	});
+	context.subscriptions.push(disposable2);
 }
 
 /**

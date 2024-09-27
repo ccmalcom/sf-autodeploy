@@ -15,8 +15,12 @@
   "contributes": {
     "commands": [
       {
-        "command": "sf-autodeploy.selectFiles",
-        "title": "SF AutoDeploy: Select Files to Watch"
+        "command": "sf-autodeploy.startWatching",
+        "title": "SF AutoDeploy: Start Watching Files for AutoDeploy"
+      },
+      {
+        "command": "sf-autodeploy.stopWatching",
+        "title": "SF AutoDeploy: Stop Watching Files for AutoDeploy"
       }
     ]
   },
