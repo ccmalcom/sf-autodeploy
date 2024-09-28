@@ -15,32 +15,10 @@ suite('Extension Test Suite', function () {
 	test('Extension should be active', async () => {
 		const extension = vscode.extensions.getExtension('ccmalcom.sf-autodeploy');
 		assert.ok(extension.isActive, 'Extension should be active after activation');
-	});
-
-	// Test that the command is registered
-	test('sf-autodeploy.selectFiles command should be registered', async () => {
+		//commands registered
 		const command = await vscode.commands.getCommands(true);
-		assert.ok(command.includes('sf-autodeploy.selectFiles'), 'Command should be registered');
-	});
-
-	// Test selecting files for watching
-	test('Selecting files to watch should open file dialog', async () => {
-		// Mock the vscode.window.showOpenDialog to simulate file selection
-		const showOpenDialog = vscode.window.showOpenDialog;
-		vscode.window.showOpenDialog = async function () {
-			// Simulate file selection by returning a mock URI array
-			return [
-				vscode.Uri.file('/mock/path/to/file')
-			];
-		};
-
-		// Simulate invoking the command
-		await vscode.commands.executeCommand('sf-autodeploy.selectFiles');
-
-		// Restore the original showOpenDialog function
-		vscode.window.showOpenDialog = showOpenDialog;
-
-		assert.ok(true, 'File selection command should run without throwing errors');
+		assert.ok(command.includes('sf-autodeploy.startWatching'), 'Command should be registered');
+		assert.ok(command.includes('sf-autodeploy.stopWatching'), 'Command should be registered');
 	});
 
 	// Test that only files from force-app/main/default directory are accepted and invalid files trigger a warning
@@ -90,7 +68,7 @@ suite('Extension Test Suite', function () {
 			};
 
 			// Simulate invoking the command
-			await vscode.commands.executeCommand('sf-autodeploy.selectFiles');
+			await vscode.commands.executeCommand('sf-autodeploy.startWatching');
 
 			// Assert correct behavior for each test case
 			assert.strictEqual(warningMessageShown, testCase.shouldShowWarning, `Warning message should ${testCase.shouldShowWarning ? 'be' : 'not be'} shown for ${testCase.description}`);
@@ -141,7 +119,7 @@ suite('Extension Test Suite', function () {
 		};
 
 		// Simulate invoking the command
-		await vscode.commands.executeCommand('sf-autodeploy.selectFiles');
+		await vscode.commands.executeCommand('sf-autodeploy.startWatching');
 
 		// Verify that a watcher was created
 		assert.ok(watcherCreated, 'File watcher should be created for selected files');
@@ -202,7 +180,7 @@ suite('Extension Test Suite', function () {
 		};
 
 		// Simulate invoking the command
-		await vscode.commands.executeCommand('sf-autodeploy.selectFiles');
+		await vscode.commands.executeCommand('sf-autodeploy.startWatching');
 
 		// Ensure onDidChangeCallback was assigned correctly before triggering
 		assert.ok(onDidChangeCallback, 'onDidChangeCallback should be assigned');
@@ -218,4 +196,58 @@ suite('Extension Test Suite', function () {
 		vscode.workspace.createFileSystemWatcher = createFileSystemWatcher;
 		vscode.window.createTerminal = createTerminal;
 	});
+
+	// test stop watching command (should dispose all watchers)
+	test('Stop watching should dispose all watchers', async () => {
+		// Mock vscode.window.showOpenDialog to simulate file selection
+		const showOpenDialog = vscode.window.showOpenDialog;
+		vscode.window.showOpenDialog = async function () {
+			return [
+				vscode.Uri.file('/mock/path/to/force-app/main/default/file')
+			];
+		};
+
+		// Mock vscode.workspace.createFileSystemWatcher
+		const createFileSystemWatcher = vscode.workspace.createFileSystemWatcher;
+		let watcherDisposed = false;
+
+		vscode.workspace.createFileSystemWatcher = function () {
+			return {
+				onDidChange: () => new vscode.EventEmitter().event,
+				onDidCreate: () => new vscode.EventEmitter().event,
+				onDidDelete: () => new vscode.EventEmitter().event,
+				ignoreCreateEvents: false,
+				ignoreChangeEvents: false,
+				ignoreDeleteEvents: false,
+				dispose: function () {
+					watcherDisposed = true;
+				}
+			};
+		};
+
+		// Simulate invoking the command
+		await vscode.commands.executeCommand('sf-autodeploy.startWatching');
+
+		// Mock vscode.window.showInformationMessage to simulate user confirmation
+		const showInformationMessage = vscode.window.showInformationMessage;
+		let informationMessageShown = false;
+
+		vscode.window.showInformationMessage = async function () {
+			informationMessageShown = true;
+		};
+
+		// Simulate invoking the stopWatching command
+		await vscode.commands.executeCommand('sf-autodeploy.stopWatching');
+
+		// Verify that all watchers were disposed
+		assert.ok(watcherDisposed, 'All watchers should be disposed when stopWatching command is invoked');
+		// Verify that an information message was shown
+		assert.ok(informationMessageShown, 'Information message should be shown when stopWatching command is invoked');
+
+		// Restore original functions
+		vscode.window.showOpenDialog = showOpenDialog;
+		vscode.workspace.createFileSystemWatcher = createFileSystemWatcher;
+		vscode.window.showInformationMessage = showInformationMessage;
+	});
+
 });
