@@ -1,5 +1,5 @@
 const vscode = require('vscode');
-
+const { exec } = require('child_process');
 class StatusBarItem {
 	constructor() {
 		this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -39,11 +39,19 @@ class StatusBarItem {
 
 let watchers, statusBarItem;
 
+function checkSFDXCLI() {
+	exec('sfdx --version', (error) => {
+		if (error) {
+			vscode.window.showErrorMessage('SF AutoDeploy not actiavted - SFDX CLI is not installed. Please install it from https://developer.salesforce.com/tools/sfdxcli.');
+			return;
+		}
+	});
+}
 /**
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
-
+	checkSFDXCLI();
 	const defaultUri = vscode.workspace.workspaceFolders
 		? vscode.workspace.workspaceFolders[0].uri.with({ path: vscode.workspace.workspaceFolders[0].uri.path + '/force-app/main/default' })
 		: vscode.Uri.file(require('os').homedir());
