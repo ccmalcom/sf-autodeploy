@@ -18,11 +18,19 @@
     "commands": [
       {
         "command": "sf-autodeploy.startWatching",
-        "title": "SF AutoDeploy: Start Watching Files for AutoDeploy"
+        "title": "SF AutoDeploy: Start Watching Files"
       },
       {
         "command": "sf-autodeploy.stopWatching",
-        "title": "SF AutoDeploy: Stop Watching Files for AutoDeploy"
+        "title": "SF AutoDeploy: Stop Watching Files"
+      },
+      {
+        "command": "sf-autodeploy.selectItems",
+        "title": "SF AutoDeploy: Select Files to Watch"
+      },
+      {
+        "command": "sf-autodeploy.reset",
+        "title": "SF AutoDeploy: Reset AutoDeploy Configuration"
       }
     ]
   },
