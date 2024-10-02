@@ -3,36 +3,45 @@ const { exec } = require('child_process');
 class StatusBarItem {
 	constructor() {
 		this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-		this.reset();  // Default state is "Click to Select Files"
+		this.statusBarItem.text = 'AutoDeploy: No Files Selected';
+		this.statusBarItem.command = 'sf-autodeploy.manageFiles';
+		this.statusBarItem.tooltip = 'Click to select files';
 		this.statusBarItem.show();
 	}
 
-	watching(numItems) {
-		this.statusBarItem.text = `AutoDeploy: Watching ${numItems} item(s)`;
-		this.statusBarItem.command = 'sf-autodeploy.stopWatching';
-		this.statusBarItem.tooltip = 'Click to stop watching files or select new items';
+	updateStatus(selectedFilePaths) {
+		if (selectedFilePaths.length > 0) {
+			this.statusBarItem.text = `AutoDeploy: ${selectedFilePaths.length} Item Selected`;
+			this.statusBarItem.tooltip = 'Click to change selected files or reset';
+		} else {
+			this.statusBarItem.text = 'AutoDeploy: No Files Selected';
+			this.statusBarItem.tooltip = 'Click to select files to watch';
+		}
 	}
 
-	deployed() {
-		this.statusBarItem.text = 'AutoDeploy: File Changed - Deployed';
-		this.statusBarItem.command = 'sf-autodeploy.stopWatching';
-	}
+	showQuickPickMenu(selectedFilePaths) {
+		let options;
 
-	deployError() {
-		this.statusBarItem.text = 'AutoDeploy: Error Deploying';
-		this.statusBarItem.command = 'sf-autodeploy.stopWatching';
-	}
+		if (selectedFilePaths.length > 0) {
+			// Show options when files are selected
+			options = [
+				{ label: 'Change Selected Files', description: 'Change the currently selected files' },
+				{ label: 'Reset Extension', description: 'Reset the extension configuration' }
+			];
+		} else {
+			// Show option when no files are selected
+			options = [{ label: 'Select Files to Watch', description: 'Select new files to watch' }];
+		}
 
-	noWatch() {
-		this.statusBarItem.text = 'AutoDeploy: Not Watching';
-		this.statusBarItem.command = 'sf-autodeploy.startWatching';  // Start watching when clicked
-		this.statusBarItem.tooltip = 'Click to start watching configured files';
-	}
+		vscode.window.showQuickPick(options).then(selectedOption => {
+			if (!selectedOption) return;
 
-	reset() {
-		this.statusBarItem.text = 'AutoDeploy: No Files Selected';
-		this.statusBarItem.command = 'sf-autodeploy.selectItems';  // Go back to select files
-		this.statusBarItem.tooltip = 'Click to select files to watch';
+			if (selectedOption.label === 'Select Files to Watch' || selectedOption.label === 'Change Selected Files') {
+				vscode.commands.executeCommand('sf-autodeploy.selectItems');
+			} else if (selectedOption.label === 'Reset Extension') {
+				vscode.commands.executeCommand('sf-autodeploy.reset');
+			}
+		});
 	}
 
 	dispose() {
@@ -40,8 +49,42 @@ class StatusBarItem {
 	}
 }
 
+class WatchStatusBarItem {
+	constructor() {
+		this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
+		this.updateStatus();  // Start with the "not watching" state
+		this.statusBarItem.show();
+	}
+
+	// Update the icon and tooltip based on the watching state
+	updateStatus(status) {
+		console.log('updateStatus invoked');
+		if (status === 'watching') {
+			this.statusBarItem.text = '$(eye)';
+			this.statusBarItem.command = 'sf-autodeploy.stopWatching';
+			this.statusBarItem.tooltip = 'Click to stop watching';
+			this.statusBarItem.color = undefined;  // Default color (active)
+		} else if (status === 'activate') {
+			this.statusBarItem.text = '$(eye-closed)';
+			this.statusBarItem.command = 'sf-autodeploy.startWatching'
+			this.statusBarItem.tooltip = 'Click to start watching files';
+			this.statusBarItem.color = undefined;  // Default color (active)
+		} else {
+			this.statusBarItem.text = '$(eye-closed)';
+			this.statusBarItem.command = undefined;
+			this.statusBarItem.tooltip = 'No files selected.';
+			this.statusBarItem.color = '#888888';  // Grey out if no files
+		}
+	}
+
+	dispose() {
+		this.statusBarItem.dispose();
+	}
+}
+
+
 let watchers = [];
-let statusBarItem;
+let statusBarItem, watchStatusBarItem;
 let selectedFilePaths = [];
 
 function checkSFDXCLI() {
@@ -58,7 +101,14 @@ function checkSFDXCLI() {
 function activate(context) {
 	checkSFDXCLI();
 	statusBarItem = new StatusBarItem();
-	context.subscriptions.push(statusBarItem);
+	watchStatusBarItem = new WatchStatusBarItem();
+	context.subscriptions.push(statusBarItem, watchStatusBarItem);
+
+	const manageFilesCommand = vscode.commands.registerCommand('sf-autodeploy.manageFiles', () => {
+		statusBarItem.showQuickPickMenu(selectedFilePaths);
+	});
+	context.subscriptions.push(manageFilesCommand);
+
 	const defaultUri = vscode.workspace.workspaceFolders
 		? vscode.workspace.workspaceFolders[0].uri.with({ path: vscode.workspace.workspaceFolders[0].uri.path + '/force-app/main/default' })
 		: vscode.Uri.file(require('os').homedir());
@@ -81,10 +131,10 @@ function activate(context) {
 				if (invalidSelections.length > 0) {
 					vscode.window.showWarningMessage('Please select only files from within the force-app/main/default directory.');
 				} else {
-					const filePaths = selectedItems.map(item => item.fsPath);
-					selectedFilePaths = filePaths;
-					vscode.window.showInformationMessage(`Saved ${filePaths.length} items to configuration.`);
-					statusBarItem.noWatch();
+					selectedFilePaths = selectedItems.map(item => item.fsPath);
+					vscode.window.showInformationMessage(`Saved ${selectedFilePaths.length} items.`);
+					statusBarItem.updateStatus(selectedFilePaths);
+					watchStatusBarItem.updateStatus('activate');
 				}
 			}
 		});
@@ -95,6 +145,8 @@ function activate(context) {
 		const filePaths = selectedFilePaths;
 		if (filePaths.length > 0) {
 			watchFiles(filePaths);
+			vscode.window.showInformationMessage(`Watching ${filePaths.length} file(s) for changes.`);
+			watchStatusBarItem.updateStatus('watching');
 		} else {
 			vscode.window.showWarningMessage('No files selected. Invoking Select Items Command.');
 			vscode.commands.executeCommand('sf-autodeploy.selectItems');
@@ -107,7 +159,7 @@ function activate(context) {
 		//get config for watched files
 		const filePaths = selectedFilePaths;
 		vscode.window.showInformationMessage(`Stopped watching files. Configuration unchanged. Configured files: ${filePaths}`);
-		statusBarItem.noWatch();
+		watchStatusBarItem.updateStatus('activate');
 	});
 	context.subscriptions.push(cmdStopWatching);
 
@@ -115,7 +167,8 @@ function activate(context) {
 		stopWatchingFiles();
 		selectedFilePaths = [];
 		vscode.window.showInformationMessage('Configuration reset. No files are being watched.');
-		statusBarItem.reset();
+		statusBarItem.updateStatus(selectedFilePaths);
+		watchStatusBarItem.updateStatus();
 	});
 	context.subscriptions.push(cmdReset);
 }
@@ -125,30 +178,17 @@ function watchFiles(filePaths) {
 
 	filePaths.forEach(filePath => {
 		const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(filePath, '**/*'));
-
 		watcher.onDidChange(uri => {
-			statusBarItem.text = 'AutoDeploy: File Changed - Deploying...';
-			deployFile(uri.fsPath).then(() => {
-				statusBarItem.deployed();
-				setTimeout(() => statusBarItem.watching(filePaths.length), 3000);
-			}).catch(() => {
-				statusBarItem.deployError();
-				setTimeout(() => statusBarItem.watching(filePaths.length), 3000);
-			});
+			deployFile(uri.fsPath);
 		});
-
 		watchers.push(watcher);
 	});
-
-	statusBarItem.watching(filePaths.length);
-	vscode.window.showInformationMessage(`Watching ${filePaths.length} file(s) for changes.`);
 }
 
 function stopWatchingFiles() {
 	if (watchers.length > 0) {
 		watchers.forEach(watcher => watcher.dispose());
 		watchers = [];
-		vscode.window.showInformationMessage('Stopped watching files.');
 	}
 }
 
